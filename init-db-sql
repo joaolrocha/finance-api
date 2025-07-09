@@ -1,0 +1,17 @@
+-- Garantir que o usuário admin existe e tem todas as permissões
+CREATE USER admin WITH PASSWORD 'root1';
+ALTER USER admin CREATEDB;
+ALTER USER admin WITH SUPERUSER;
+
+-- Garantir que o banco existe
+CREATE DATABASE finance_db OWNER admin;
+
+-- Conectar no banco e dar permissões
+\c finance_db;
+GRANT ALL PRIVILEGES ON DATABASE finance_db TO admin;
+GRANT ALL PRIVILEGES ON SCHEMA public TO admin;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO admin;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO admin;
+
+-- Verificar
+SELECT current_user, current_database();
