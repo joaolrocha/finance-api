@@ -9,6 +9,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
 import { IsString, MinLength } from 'class-validator';
 import { User } from '../users/entities/user.entity';
@@ -31,6 +38,7 @@ class ChangePasswordDto {
   newPassword: string;
 }
 
+@ApiTags('Auth')
 @Controller('auth')
 @UseInterceptors(ClassSerializerInterceptor)
 @UseGuards(JwtAuthGuard)
@@ -42,6 +50,13 @@ export class AuthController {
 
   @Public()
   @Post('register')
+  @ApiOperation({ summary: 'Registrar novo usuário' })
+  @ApiResponse({
+    status: 201,
+    description: 'Usuário registrado com sucesso',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 409, description: 'Email já está em uso' })
   async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
     const { user, accessToken } = await this.authService.register(registerDto);
 
@@ -55,6 +70,13 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @ApiOperation({ summary: 'Fazer login' })
+  @ApiResponse({
+    status: 200,
+    description: 'Login realizado com sucesso',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Email ou senha inválidos' })
   async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
     const { user, accessToken } = await this.authService.login(loginDto);
 
@@ -67,11 +89,26 @@ export class AuthController {
   }
 
   @Get('profile')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Obter perfil do usuário logado' })
+  @ApiResponse({
+    status: 200,
+    description: 'Perfil retornado com sucesso',
+    type: UserResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
   async getProfile(@CurrentUser() user: User): Promise<UserResponseDto> {
     return plainToInstance(UserResponseDto, user);
   }
 
   @Patch('profile')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Atualizar perfil do usuário' })
+  @ApiResponse({
+    status: 200,
+    description: 'Perfil atualizado com sucesso',
+    type: UserResponseDto,
+  })
   async updateProfile(
     @CurrentUser('id') userId: string,
     @Body() updateUserDto: UpdateUserDto,
@@ -81,6 +118,9 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Renovar token de acesso' })
+  @ApiResponse({ status: 200, description: 'Token renovado com sucesso' })
   async refreshToken(
     @CurrentUser() user: User,
   ): Promise<{ accessToken: string }> {
@@ -88,6 +128,11 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Alterar senha do usuário' })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiResponse({ status: 200, description: 'Senha alterada com sucesso' })
+  @ApiResponse({ status: 401, description: 'Senha atual inválida' })
   async changePassword(
     @CurrentUser('id') userId: string,
     @Body() changePasswordDto: ChangePasswordDto,
@@ -102,6 +147,13 @@ export class AuthController {
   }
 
   @Get('me')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Obter dados completos do usuário logado' })
+  @ApiResponse({
+    status: 200,
+    description: 'Dados retornados com sucesso',
+    type: UserResponseDto,
+  })
   async getMe(@CurrentUser() user: User): Promise<UserResponseDto> {
     const fullUser = await this.authService.getProfile(user.id);
     return plainToInstance(UserResponseDto, fullUser);

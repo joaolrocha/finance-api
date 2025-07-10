@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
@@ -9,22 +10,46 @@ import {
 } from 'class-validator';
 
 export class RegisterDto {
+  @ApiProperty({
+    description: 'Email do usuário',
+    example: 'joao@finance.com',
+    format: 'email',
+  })
   @IsEmail({}, { message: 'Email deve ter um formato válido' })
   @Transform(({ value }) => value?.toLowerCase().trim())
   email: string;
 
+  @ApiProperty({
+    description: 'Nome completo do usuário',
+    example: 'João Silva',
+    minLength: 2,
+  })
   @IsString({ message: 'Nome é obrigatório' })
   @Transform(({ value }) => value?.trim())
   name: string;
 
+  @ApiProperty({
+    description: 'Senha do usuário',
+    example: '123456',
+    minLength: 6,
+  })
   @IsString({ message: 'Senha é obrigatória' })
   @MinLength(6, { message: 'Senha deve ter pelo menos 6 caracteres' })
   password: string;
 
+  @ApiPropertyOptional({
+    description: 'URL do avatar do usuário',
+    example: 'https://example.com/avatar.jpg',
+  })
   @IsOptional()
   @IsString()
   avatar?: string;
 
+  @ApiPropertyOptional({
+    description: 'Renda mensal do usuário',
+    example: 5000,
+    minimum: 0,
+  })
   @IsOptional()
   @IsNumber({}, { message: 'Renda mensal deve ser um número' })
   @Min(0, { message: 'Renda mensal deve ser positiva' })
