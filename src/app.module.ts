@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { TransactionsModule } from './modules/transactions/transactions.module';
-import { UsersModule } from './modules/users/users.module';
+import databaseConfig from './config/database.config';
+import { AuthModule } from './modules/auth/auth.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { GoalsModule } from './modules/goals/goals.module';
-import { AuthModule } from './modules/auth/auth.module';
-import databaseConfig from './config/database.config';
+import { TransactionsModule } from './modules/transactions/transactions.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -25,6 +27,7 @@ import databaseConfig from './config/database.config';
       useFactory: (configService: ConfigService) =>
         configService.get('database'),
     }),
+    AuthModule,
 
     CategoriesModule,
 
@@ -37,6 +40,12 @@ import databaseConfig from './config/database.config';
     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

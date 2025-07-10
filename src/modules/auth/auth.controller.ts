@@ -1,34 +1,109 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Body,
+  ClassSerializerInterceptor,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { plainToInstance } from 'class-transformer';
+import { IsString, MinLength } from 'class-validator';
+import { User } from '../users/entities/user.entity';
+import { UpdateUserDto } from '../users/dto/update-user.dto';
+import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthService } from './auth.service';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { Public } from './decorators/public.decorator';
+import { CurrentUser } from './decorators/user.decorator';
+import { AuthResponseDto } from './dto/auth-response.dto';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+
+class ChangePasswordDto {
+  @IsString({ message: 'Senha atual é obrigatória' })
+  currentPassword: string;
+
+  @IsString({ message: 'Nova senha é obrigatória' })
+  @MinLength(6, { message: 'Nova senha deve ter pelo menos 6 caracteres' })
+  newPassword: string;
+}
 
 @Controller('auth')
+@UseInterceptors(ClassSerializerInterceptor)
+@UseGuards(JwtAuthGuard)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  @Post()
-  create(@Body() createAuthDto: CreateAuthDto) {
-    return this.authService.create(createAuthDto);
+  @Public()
+  @Post('register')
+  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
+    const { user, accessToken } = await this.authService.register(registerDto);
+
+    return {
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '7d',
+      user: plainToInstance(UserResponseDto, user),
+    };
   }
 
-  @Get()
-  findAll() {
-    return this.authService.findAll();
+  @Public()
+  @Post('login')
+  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
+    const { user, accessToken } = await this.authService.login(loginDto);
+
+    return {
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '7d',
+      user: plainToInstance(UserResponseDto, user),
+    };
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.authService.findOne(+id);
+  @Get('profile')
+  async getProfile(@CurrentUser() user: User): Promise<UserResponseDto> {
+    return plainToInstance(UserResponseDto, user);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAuthDto: UpdateAuthDto) {
-    return this.authService.update(+id, updateAuthDto);
+  @Patch('profile')
+  async updateProfile(
+    @CurrentUser('id') userId: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ): Promise<UserResponseDto> {
+    const user = await this.authService.updateProfile(userId, updateUserDto);
+    return plainToInstance(UserResponseDto, user);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.authService.remove(+id);
+  @Post('refresh')
+  async refreshToken(
+    @CurrentUser() user: User,
+  ): Promise<{ accessToken: string }> {
+    return await this.authService.refreshToken(user);
+  }
+
+  @Post('change-password')
+  async changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    await this.authService.changePassword(
+      userId,
+      changePasswordDto.currentPassword,
+      changePasswordDto.newPassword,
+    );
+
+    return { message: 'Senha alterada com sucesso' };
+  }
+
+  @Get('me')
+  async getMe(@CurrentUser() user: User): Promise<UserResponseDto> {
+    const fullUser = await this.authService.getProfile(user.id);
+    return plainToInstance(UserResponseDto, fullUser);
   }
 }
