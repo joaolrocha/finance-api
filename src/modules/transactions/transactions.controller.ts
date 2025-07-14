@@ -12,6 +12,14 @@ import {
   UseInterceptors,
   ValidationPipe,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { TransactionFiltersDto } from './dto/transaction-filters.dto';
@@ -20,12 +28,22 @@ import { TransactionStatsDto } from './dto/transaction-stats.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { TransactionsService } from './transactions.service';
 
+@ApiTags('Transactions')
+@ApiBearerAuth('JWT-auth')
 @Controller('transactions')
 @UseInterceptors(ClassSerializerInterceptor)
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Criar nova transação' })
+  @ApiResponse({
+    status: 201,
+    description: 'Transação criada com sucesso',
+    type: TransactionResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  @ApiResponse({ status: 404, description: 'Categoria não encontrada' })
   async create(
     @Body() createTransactionDto: CreateTransactionDto,
   ): Promise<TransactionResponseDto> {
@@ -35,6 +53,83 @@ export class TransactionsController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'Listar transações com filtros e paginação' })
+  @ApiQuery({ name: 'userId', description: 'ID do usuário', required: true })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Filtrar por tipo (income/expense)',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filtrar por status',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'Filtrar por categoria',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Data inicial (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Data final (YYYY-MM-DD)',
+  })
+  @ApiQuery({ name: 'minAmount', required: false, description: 'Valor mínimo' })
+  @ApiQuery({ name: 'maxAmount', required: false, description: 'Valor máximo' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Buscar no título/descrição',
+  })
+  @ApiQuery({ name: 'tag', required: false, description: 'Filtrar por tag' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Página (padrão: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Itens por página (padrão: 20)',
+  })
+  @ApiQuery({
+    name: 'orderBy',
+    required: false,
+    description: 'Campo ordenação (padrão: date)',
+  })
+  @ApiQuery({
+    name: 'order',
+    required: false,
+    description: 'Direção (ASC/DESC, padrão: DESC)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Transações retornadas com sucesso',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/TransactionResponseDto' },
+        },
+        pagination: {
+          type: 'object',
+          properties: {
+            total: { type: 'number', example: 150 },
+            page: { type: 'number', example: 1 },
+            limit: { type: 'number', example: 20 },
+            totalPages: { type: 'number', example: 8 },
+          },
+        },
+      },
+    },
+  })
   async findAll(
     @Query('userId') userId: string,
     @Query(new ValidationPipe({ transform: true, whitelist: true }))
@@ -64,6 +159,23 @@ export class TransactionsController {
   }
 
   @Get('stats')
+  @ApiOperation({ summary: 'Obter estatísticas completas das transações' })
+  @ApiQuery({ name: 'userId', description: 'ID do usuário', required: true })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Data inicial para filtro (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Data final para filtro (YYYY-MM-DD)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estatísticas retornadas com sucesso',
+    type: TransactionStatsDto,
+  })
   async getStats(
     @Query('userId') userId: string,
     @Query('startDate') startDate?: string,
@@ -73,6 +185,33 @@ export class TransactionsController {
   }
 
   @Get('summary')
+  @ApiOperation({
+    summary: 'Obter resumo financeiro (receitas, despesas, saldo)',
+  })
+  @ApiQuery({ name: 'userId', description: 'ID do usuário', required: true })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Data inicial para filtro (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Data final para filtro (YYYY-MM-DD)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Resumo financeiro retornado com sucesso',
+    schema: {
+      type: 'object',
+      properties: {
+        totalIncome: { type: 'number', example: 5000.0 },
+        totalExpense: { type: 'number', example: 3200.5 },
+        balance: { type: 'number', example: 1799.5 },
+        transactionCount: { type: 'number', example: 25 },
+      },
+    },
+  })
   async getSummary(
     @Query('userId') userId: string,
     @Query('startDate') startDate?: string,
@@ -98,6 +237,35 @@ export class TransactionsController {
   }
 
   @Get('by-category')
+  @ApiOperation({ summary: 'Obter gastos agrupados por categoria' })
+  @ApiQuery({ name: 'userId', description: 'ID do usuário', required: true })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Data inicial para filtro (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Data final para filtro (YYYY-MM-DD)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Dados agrupados por categoria retornados com sucesso',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          categoryId: { type: 'string', example: 'uuid-categoria' },
+          categoryName: { type: 'string', example: 'Alimentação' },
+          total: { type: 'number', example: 800.0 },
+          count: { type: 'number', example: 15 },
+          type: { type: 'string', example: 'expense' },
+        },
+      },
+    },
+  })
   async getByCategory(
     @Query('userId') userId: string,
     @Query('startDate') startDate?: string,
@@ -120,6 +288,15 @@ export class TransactionsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Buscar transação por ID' })
+  @ApiParam({ name: 'id', description: 'ID único da transação' })
+  @ApiQuery({ name: 'userId', description: 'ID do usuário', required: true })
+  @ApiResponse({
+    status: 200,
+    description: 'Transação encontrada com sucesso',
+    type: TransactionResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Transação não encontrada' })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('userId') userId: string,
@@ -129,6 +306,16 @@ export class TransactionsController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Atualizar transação' })
+  @ApiParam({ name: 'id', description: 'ID único da transação' })
+  @ApiQuery({ name: 'userId', description: 'ID do usuário', required: true })
+  @ApiResponse({
+    status: 200,
+    description: 'Transação atualizada com sucesso',
+    type: TransactionResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Transação não encontrada' })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTransactionDto: UpdateTransactionDto,
@@ -143,6 +330,20 @@ export class TransactionsController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Remover transação' })
+  @ApiParam({ name: 'id', description: 'ID único da transação' })
+  @ApiQuery({ name: 'userId', description: 'ID do usuário', required: true })
+  @ApiResponse({
+    status: 200,
+    description: 'Transação removida com sucesso',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Transação removida com sucesso' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Transação não encontrada' })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('userId') userId: string,
