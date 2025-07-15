@@ -30,7 +30,7 @@ async function bootstrap() {
       'JWT-auth',
     )
     .addTag('Auth', 'Endpoints de autenticação')
-    .addTag('Users', 'Gestão de usuários')
+    // .addTag('Users', 'Gestão de usuários')
     .addTag('Categories', 'Gestão de categorias')
     .addTag('Transactions', 'Gestão de transações')
     .addTag('Goals', 'Gestão de metas financeiras')
